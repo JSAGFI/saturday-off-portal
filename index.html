@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saturday Off Calendar Portal</title>
+    <!-- Tailwind CSS for modern, clean styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js for lightweight reactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold tracking-wide">Saturday Off Portal</h1>
+            <div class="text-sm text-slate-300" x-data="{ user: localStorage.getItem('saturday_user') || '' }">
+                <template x-if="user">
+                    <span>Logged in as: <strong class="text-white" x-text="user"></strong></span>
+                </template>
+                <template x-if="!user">
+                    <button @click="let email = prompt('Enter your work email to log in:'); if(email) { localStorage.setItem('saturday_user', email); window.location.reload(); }" class="bg-indigo-600 px-3 py-1 rounded text-xs font-semibold hover:bg-indigo-500">Log In</button>
+                </template>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content: Calendar Grid Container -->
+    <main class="flex-grow max-w-5xl w-full mx-auto px-4 py-8" x-data="calendarApp()">
+        
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-slate-900" x-text="currentMonthName"></h2>
+            <div class="space-x-2">
+                <button @click="changeMonth(-1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-100">Previous</button>
+                <button @click="changeMonth(1)" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-100">Next</button>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex gap-4 mb-6 text-xs font-medium text-slate-600">
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Available Saturday</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500"></span> Claimed / Off</div>
+            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Pending Override</div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <template x-for="saturday in saturdaysInMonth" :key="saturday.date">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between transition hover:shadow-md">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-lg font-bold text-slate-900" x-text="saturday.formattedDate"></span>
+                            <!-- Status Badge -->
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                                :class="{
+                                    'bg-emerald-100 text-emerald-800': saturday.status === 'Available',
+                                    'bg-rose-100 text-rose-800': saturday.status === 'Claimed',
+                                    'bg-amber-100 text-amber-800': saturday.status === 'Pending'
+                                }"
+                                x-text="saturday.status">
+                            </span>
+                        </div>
+                        <p class="text-sm text-slate-500 mb-4" x-text="saturday.claimedBy ? 'Off: ' + saturday.claimedBy : 'Slot is open for selection'"></p>
+                    </div>
+
+                    <!-- Action Button -->
+                    <div>
+                        <template x-if="saturday.status === 'Available'">
+                            <button @click="claimDate(saturday.date)" class="w-full bg-emerald-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-emerald-500 transition">
+                                Claim This Saturday
+                            </button>
+                        </template>
+                        <template x-if="saturday.status !== 'Available'">
+                            <button @click="requestOverride(saturday.date)" class="w-full bg-amber-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-amber-500 transition">
+                                Request Override (Overlap)
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+        Saturday Off Tracking System &bull; Jeff Schmitt Auto Group Support
+    </footer>
+
+    <!-- App Logic Script -->
+    <script>
+        function calendarApp() {
+            return {
+                currentDate: new Date(),
+                saturdaysInMonth: [],
+                
+                init() {
+                    this.loadSaturdays();
+                },
+
+                get currentMonthName() {
+                    return this.currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                },
+
+                loadSaturdays() {
+                    // This generates the Saturdays for the currently viewed month
+                    // (In production, this data array will pull straight from your Supabase/GitHub database)
+                    const year = this.currentDate.getFullYear();
+                    const month = this.currentDate.getMonth();
+                    let saturdays = [];
+
+                    let date = new Date(year, month, 1);
+                    // Move to first Saturday of the month
+                    while (date.getDay() !== 6) {
+                        date.setDate(date.getDate() + 1);
+                    }
+
+                    while (date.getMonth() === month) {
+                        let dateString = date.toISOString().split('T')[0];
+                        
+                        // Mocking sample status for layout visualization
+                        let status = 'Available';
+                        let claimedBy = '';
+                        if (date.getDate() === 7) { status = 'Claimed'; claimedBy = 'jsmith@jeffdeals.com'; }
+                        if (date.getDate() === 21) { status = 'Pending'; claimedBy = 'bwhite@jeffdeals.com (Req)'; }
+
+                        saturdays.push({
+                            date: dateString,
+                            formattedDate: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                            status: status,
+                            claimedBy: claimedBy
+                        });
+
+                        date.setDate(date.getDate() + 7);
+                    }
+                    this.saturdaysInMonth = saturdays;
+                },
+
+                changeMonth(direction) {
+                    this.currentDate.setMonth(this.currentDate.getMonth() + direction);
+                    this.loadSaturdays();
+                },
+
+                claimDate(dateStr) {
+                    let user = localStorage.getItem('saturday_user');
+                    if (!user) {
+                        alert('Please log in with your email first.');
+                        return;
+                    }
+                    if (confirm(`Are you sure you want to claim Saturday, ${dateStr}?`)) {
+                        alert(`Success! Saturday ${dateStr} has been locked in for ${user}.`);
+                        // Here the app writes to your database backend
+                        this.loadSaturdays();
+                    }
+                },
+
+                requestOverride(dateStr) {
+                    let user = localStorage.getItem('saturday_user');
+                    if (!user) {
+                        alert('Please log in with your email first.');
+                        return;
+                    }
+                    if (confirm(`This Saturday is already taken. Do you want to submit a manager override request for ${dateStr}?`)) {
+                        alert(`Override request submitted to Chris Ault for ${dateStr}.`);
+                        // Here the app flags a pending overlap request
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
